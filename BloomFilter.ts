@@ -13,7 +13,7 @@ class BloomFilter {
     this.expectedItems = expectedItems;
     this.falsePositiveRate = falsePositiveRate;
     this.bitCount = this._bitCountCaculator(expectedItems, falsePositiveRate);
-    this.hashCount = this._hashCountCaculator(this.bitCount, falsePositiveRate);
+    this.hashCount = this._hashCountCaculator(this.bitCount, expectedItems);
 
     this.byteSize = Math.ceil(this.bitCount / 8);
     this.buffer = Buffer.allocUnsafe(this.byteSize);
@@ -32,10 +32,10 @@ class BloomFilter {
     return Math.ceil(valueFormula);
   }
 
-  private _hashCountCaculator(bitCount: number, falsePositiveRate: number) {
-    if (falsePositiveRate == 0)
+  private _hashCountCaculator(bitCount: number, expectedItems: number) {
+    if (expectedItems == 0)
       throw Error("False Positive Rate (FPR) cannot be zero!");
-    const valueFormula = (bitCount * Math.log(2)) / falsePositiveRate;
+    const valueFormula = (bitCount / expectedItems) * Math.log(2);
     return Math.ceil(valueFormula);
   }
 
@@ -52,7 +52,7 @@ class BloomFilter {
     const h1 = this._fnv1a(value);
     const h2 = this._fnv1a(value + "\x00MST_Software");
     const positions = [];
-    for (let i = 0; i < value.length; ++i) {
+    for (let i = 0; i < this.hashCount; ++i) {
       const position = ((h1 + i * h2) >>> 0) % this.bitCount;
       positions.push(position);
     }
@@ -61,19 +61,19 @@ class BloomFilter {
 
   private _setBit(position: number) {
     const byteIndex = Math.floor(position / 8);
-    const bitIndex = byteIndex % 8;
+    const bitIndex = position % 8;
 
     this.buffer[byteIndex]! |= 1 << bitIndex;
   }
 
   private _getBit(position: number) {
     const byteIndex = Math.floor(position / 8);
-    const bitIndex = byteIndex % 8;
+    const bitIndex = position % 8;
 
     return (this.buffer[byteIndex]! & (1 << bitIndex)) !== 0;
   }
 
-  private _add(value: string) {
+  public add(value: string) {
     const positions = this._getHashPositions(value);
     for (let position of positions) {
       this._setBit(position);
@@ -81,7 +81,7 @@ class BloomFilter {
     this.itemCount++;
   }
 
-  private _has(value: string) {
+  public has(value: string) {
     const positions = this._getHashPositions(value);
     for (let position of positions) {
       if (!this._getBit(position)) {
