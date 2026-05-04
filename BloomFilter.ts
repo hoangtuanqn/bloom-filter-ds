@@ -4,6 +4,8 @@ class BloomFilter {
   bitCount: number;
   hashCount: number;
   byteSize: number;
+  buffer: Buffer<ArrayBuffer>;
+  itemCount: number = 0;
   constructor(
     expectedItems: number = 1_000_000_000,
     falsePositiveRate: number = 0.0001,
@@ -14,7 +16,7 @@ class BloomFilter {
     this.hashCount = this._hashCountCaculator(this.bitCount, falsePositiveRate);
 
     this.byteSize = Math.ceil(this.bitCount / 8);
-    Buffer.allocUnsafe(this.byteSize);
+    this.buffer = Buffer.allocUnsafe(this.byteSize);
 
     console.info(
       `Memory usage: ${Math.ceil(this.byteSize / 1024 / 1024 / 1024)} GB`,
@@ -35,6 +37,75 @@ class BloomFilter {
       throw Error("False Positive Rate (FPR) cannot be zero!");
     const valueFormula = (bitCount * Math.log(2)) / falsePositiveRate;
     return Math.ceil(valueFormula);
+  }
+
+  private _fnv1a(value: string) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < value.length; ++i) {
+      hash ^= value.charCodeAt(i);
+      hash = (hash * 0x01000193) >>> 0;
+    }
+    return hash;
+  }
+
+  private _getHashPositions(value: string): number[] {
+    const h1 = this._fnv1a(value);
+    const h2 = this._fnv1a(value + "\x00MST_Software");
+    const positions = [];
+    for (let i = 0; i < value.length; ++i) {
+      const position = ((h1 + i * h2) >>> 0) % this.bitCount;
+      positions.push(position);
+    }
+    return positions;
+  }
+
+  private _setBit(position: number) {
+    const byteIndex = Math.floor(position / 8);
+    const bitIndex = byteIndex % 8;
+
+    this.buffer[byteIndex]! |= 1 << bitIndex;
+  }
+
+  private _getBit(position: number) {
+    const byteIndex = Math.floor(position / 8);
+    const bitIndex = byteIndex % 8;
+
+    return (this.buffer[byteIndex]! & (1 << bitIndex)) !== 0;
+  }
+
+  private _add(value: string) {
+    const positions = this._getHashPositions(value);
+    for (let position of positions) {
+      this._setBit(position);
+    }
+    this.itemCount++;
+  }
+
+  private _has(value: string) {
+    const positions = this._getHashPositions(value);
+    for (let position of positions) {
+      if (!this._getBit(position)) {
+        return BloomResult.definitelyNot(positions);
+      }
+    }
+
+    return BloomResult.possiblyYes(positions, 0);
+  }
+}
+
+class BloomResult {
+  constructor(
+    public result: "definitely_not" | "possibly_yes",
+    public checkedBits: number[],
+    public falsePositiveProbability: number,
+  ) {}
+
+  static definitelyNot(bits: number[]) {
+    return new BloomResult("definitely_not", bits, 0);
+  }
+
+  static possiblyYes(bits: number[], fp: number) {
+    return new BloomResult("possibly_yes", bits, fp);
   }
 }
 export default BloomFilter;
