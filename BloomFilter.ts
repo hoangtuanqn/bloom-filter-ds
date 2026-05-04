@@ -16,7 +16,7 @@ class BloomFilter {
     this.hashCount = this._hashCountCaculator(this.bitCount, expectedItems);
 
     this.byteSize = Math.ceil(this.bitCount / 8);
-    this.buffer = Buffer.allocUnsafe(this.byteSize);
+    this.buffer = Buffer.alloc(this.byteSize);
 
     console.info(
       `Memory usage: ${Math.ceil(this.byteSize / 1024 / 1024 / 1024)} GB`,
@@ -50,7 +50,7 @@ class BloomFilter {
 
   private _getHashPositions(value: string): number[] {
     const h1 = this._fnv1a(value);
-    const h2 = this._fnv1a(value + "\x00MST_Software");
+    const h2 = this._fnv1a(value + "\x00SALT" + value.split("").reverse().join(""));
     const positions = [];
     for (let i = 0; i < this.hashCount; ++i) {
       const position = ((h1 + i * h2) >>> 0) % this.bitCount;
@@ -64,6 +64,8 @@ class BloomFilter {
     const bitIndex = position % 8;
 
     this.buffer[byteIndex]! |= 1 << bitIndex;
+    // console.log(this.buffer[byteIndex]);
+
   }
 
   private _getBit(position: number) {
@@ -98,7 +100,7 @@ class BloomResult {
     public result: "definitely_not" | "possibly_yes",
     public checkedBits: number[],
     public falsePositiveProbability: number,
-  ) {}
+  ) { }
 
   static definitelyNot(bits: number[]) {
     return new BloomResult("definitely_not", bits, 0);
