@@ -90,8 +90,15 @@ class BloomFilter {
         return BloomResult.definitelyNot(positions);
       }
     }
+    const fpr = this._falsePositveRate();
+    return BloomResult.possiblyYes(positions, fpr);
+  }
 
-    return BloomResult.possiblyYes(positions, 0);
+  private _falsePositveRate() {
+    const k: number = this.hashCount;
+    const m: number = this.bitCount;
+    const n: number = this.itemCount;
+    return Math.pow(1 - Math.exp((-k * n) / m), k);
   }
 }
 

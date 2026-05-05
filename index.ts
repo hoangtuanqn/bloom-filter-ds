@@ -10,9 +10,11 @@ for (let i = 0; i < 7_000_000; i++) {
   //   console.log(email);
 }
 let count = 0;
-for (let i = 0; i < 7_000_000; i++) {
-  const email = `email-1@gmail.com`;
+// for (let i = 0; i < 7_000_000; i++) {
+//   const email = `email-1@gmail.com`;
 
-  if (bf.has(email).result == "definitely_not") count++;
-}
-console.log(count);
+//   if (bf.has(email).result == "definitely_not") count++;
+// }
+console.log(bf.has(`email@gmail.com`));
+console.log(bf.has(`email1@gmail.com`));
+
